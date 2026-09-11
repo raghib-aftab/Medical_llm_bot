@@ -1,0 +1,35 @@
+.chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: white;
+  height: 100vh;
+  min-height: 0;
+}
+
+.no-chat-selected {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+}
+
+.no-chat-selected h2 {
+  color: #1976d2;
+  margin-bottom: 16px;
+}
+
+.chat-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: white;
+}
+
+.chat-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 16px;
+  font-weight: 500;
+}

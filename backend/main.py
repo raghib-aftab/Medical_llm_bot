@@ -25,12 +25,11 @@ app = FastAPI(title="Medical Healthcare API", lifespan=lifespan)
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
+    # Line 28-34 - ADD YOUR VERCEL URL
     allow_origins=[
         "http://localhost:5173",
         "http://localhost:3000",
-        "https://medical-ai-agent.netlify.app",
-        "https://medical-llm-bot-brown.vercel.app",
-        "https://medical-llm-bw4yy2pn7-code-x-e1c4.vercel.app",
+        "https://medical-llm-bot.vercel.app",  # ← Paste your Vercel URL here
     ],
     allow_credentials=True,
     allow_methods=["*"],

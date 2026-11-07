@@ -1,8 +1,6 @@
-import smtplib
+import httpx
 import random
 import string
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from typing import Optional
 from datetime import datetime, timedelta
 import zoneinfo
@@ -11,46 +9,58 @@ from config import settings
 
 class EmailService:
     def __init__(self):
-        self.smtp_server = "smtp.gmail.com"
-        self.smtp_port = 587
-        self.sender_email = settings.gmail_user
-        self.sender_password = settings.gmail_pass
-        
+        # Resend API settings (HTTP-based, works on Render free tier)
+        self.api_key = getattr(settings, 'resend_api_key', None)
+        self.from_email = getattr(settings, 'resend_from_email', 'onboarding@resend.dev')
+
         # In-memory OTP storage (use Redis in production)
         self.otp_storage = {}
-        
-    def _send_email(self, to_email: str, subject: str, html_content: str) -> bool:
-        """Send email using SMTP"""
+
+    async def _send_email(self, to_email: str, subject: str, html_content: str) -> bool:
+        """Send email using Resend HTTP API"""
+        if not self.api_key:
+            print("RESEND_API_KEY not configured in environment")
+            return False
+
         try:
-            message = MIMEMultipart("alternative")
-            message["Subject"] = subject
-            message["From"] = self.sender_email
-            message["To"] = to_email
-            
-            html_part = MIMEText(html_content, "html")
-            message.attach(html_part)
-            
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.sender_email, self.sender_password)
-                server.sendmail(self.sender_email, to_email, message.as_string())
-            
-            return True
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.resend.com/emails",
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "from": self.from_email,
+                        "to": [to_email],
+                        "subject": subject,
+                        "html": html_content,
+                    },
+                    timeout=30.0
+                )
+
+                if response.status_code == 200:
+                    print(f"Email sent successfully to {to_email}")
+                    return True
+                else:
+                    print(f"Resend API error: {response.status_code} - {response.text}")
+                    return False
+
         except Exception as e:
-            print(f"Error sending email: {type(e).__name__}: {e}")
+            print(f"Error sending email via Resend: {type(e).__name__}: {e}")
             import traceback
             traceback.print_exc()
             return False
-    
+
     def generate_otp(self, length: int = 6) -> str:
         """Generate a random numeric OTP"""
         return ''.join(random.choices(string.digits, k=length))
-    
+
     def generate_password(self, length: int = 12) -> str:
         """Generate a random password"""
         chars = string.ascii_letters + string.digits + "!@#$%"
         return ''.join(random.choices(chars, k=length))
-    
+
     def store_otp(self, email: str, otp: str, user_data: dict = None):
         """Store OTP with expiry time (5 minutes)"""
         self.otp_storage[email] = {
@@ -58,25 +68,25 @@ class EmailService:
             "expires_at": datetime.now(zoneinfo.ZoneInfo("Asia/Kolkata")) + timedelta(minutes=5),
             "user_data": user_data
         }
-    
+
     def verify_otp(self, email: str, otp: str) -> tuple[bool, Optional[dict]]:
         """Verify OTP and return user data if valid"""
         if email not in self.otp_storage:
             return False, None
-        
+
         stored = self.otp_storage[email]
-        
+
         if datetime.now(zoneinfo.ZoneInfo("Asia/Kolkata")) > stored["expires_at"]:
             del self.otp_storage[email]
             return False, None
-        
+
         if stored["otp"] != otp:
             return False, None
-        
+
         user_data = stored.get("user_data")
         del self.otp_storage[email]
         return True, user_data
-    
+
     async def send_signup_otp(self, email: str, name: str, otp: str) -> bool:
         """Send OTP for signup verification"""
         subject = "Verify Your Email - Medical AI"
@@ -113,8 +123,8 @@ class EmailService:
         </body>
         </html>
         """
-        return self._send_email(email, subject, html_content)
-    
+        return await self._send_email(email, subject, html_content)
+
     async def send_password_reset(self, email: str, name: str, new_password: str) -> bool:
         """Send new password for forgot password"""
         subject = "Password Reset - Medical AI"
@@ -154,12 +164,12 @@ class EmailService:
         </body>
         </html>
         """
-        return self._send_email(email, subject, html_content)
-    
+        return await self._send_email(email, subject, html_content)
+
     async def send_appointment_confirmation(
-        self, 
-        email: str, 
-        name: str, 
+        self,
+        email: str,
+        name: str,
         doctor_name: str,
         specialization: str,
         appointment_date: str,
@@ -197,7 +207,7 @@ class EmailService:
                     <span class="success-badge">✓ Confirmed</span>
                     <h2>Hello {name}!</h2>
                     <p>Your appointment has been successfully booked. Here are the details:</p>
-                    
+
                     <div class="appointment-card">
                         <h3>📋 Appointment Details</h3>
                         <div class="detail-row">
@@ -225,7 +235,7 @@ class EmailService:
                             <span class="detail-value">{reason or 'Not specified'}</span>
                         </div>
                     </div>
-                    
+
                     <p><strong>Please arrive 15 minutes before your scheduled time.</strong></p>
                     <p>If you need to reschedule or cancel, please do so at least 24 hours in advance.</p>
                 </div>
@@ -236,12 +246,12 @@ class EmailService:
         </body>
         </html>
         """
-        return self._send_email(email, subject, html_content)
-    
+        return await self._send_email(email, subject, html_content)
+
     async def send_appointment_cancellation(
-        self, 
-        email: str, 
-        name: str, 
+        self,
+        email: str,
+        name: str,
         doctor_name: str,
         specialization: str,
         appointment_date: str,
@@ -279,7 +289,7 @@ class EmailService:
                     <span class="cancelled-badge">✗ Cancelled</span>
                     <h2>Hello {name}!</h2>
                     <p>Your appointment has been cancelled. Here were the details:</p>
-                    
+
                     <div class="appointment-card">
                         <h3>📋 Cancelled Appointment</h3>
                         <div class="detail-row">
@@ -303,7 +313,7 @@ class EmailService:
                             <span class="detail-value">{appointment_time}</span>
                         </div>
                     </div>
-                    
+
                     <p>If you need to book a new appointment, please visit our platform.</p>
                 </div>
                 <div class="footer">
@@ -313,7 +323,7 @@ class EmailService:
         </body>
         </html>
         """
-        return self._send_email(email, subject, html_content)
+        return await self._send_email(email, subject, html_content)
 
 
 # Create singleton instance

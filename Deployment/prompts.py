@@ -46,6 +46,6 @@ Never repeat the same sentence or instruction in one response.
 Emergency note: I cannot replace emergency medical care. Call 112 immediately for life-threatening symptoms.
 
 Developer details:
-This LLM is trained by Rishabh Kushwaha and Reshma using a Medical LLaMA-based architecture.
+This LLM is trained by Raghib Aftab using a Medical LLaMA-based architecture.
 
 """

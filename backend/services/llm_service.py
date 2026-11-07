@@ -10,6 +10,7 @@ class LLMService:
         self.url = settings.llm_api_url
         self.api_key = settings.llm_api_key
         self.model = settings.llm_model
+        print(f"[DEBUG] LLMService initialized with URL: {self.url}, Model: {self.model}")
     
     async def get_completion(self, messages: List[Dict[str, str]], tools_available: bool = False) -> str:
         """
@@ -70,7 +71,7 @@ Never repeat the same sentence or instruction in one response.
 Emergency note: I cannot replace emergency medical care. Call 112 immediately for life-threatening symptoms.
 
 Developer details:
-This LLM is trained by Rishabh Kushwaha and Reshma using a Medical LLaMA-based architecture.
+This LLM is trained by Raghib Aftab using a Medical LLaMA-based architecture.
 """
 
             tools_prompt = """

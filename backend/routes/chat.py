@@ -87,7 +87,11 @@ async def extract_pending_booking(messages: List[dict]) -> Optional[Dict]:
                         booking["specialization"] = doctor.get("specialization")
                     if not booking.get("hospital_name"):
                         booking["hospital_name"] = doctor.get("hospital")
-                    print(f"[DEBUG] Found doctor from database: {doctor.get('id')} - {doctor.get('name')}")
+                    try:
+                        print(f"[DEBUG] Found doctor from database: {doctor.get('id')} - {doctor.get('name')}")
+                    except UnicodeEncodeError:
+                        safe_msg = f"[DEBUG] Found doctor from database: {doctor.get('id')} - {doctor.get('name')}".encode('ascii', 'replace').decode('ascii')
+                        print(safe_msg)
         
         # Validate we have all required fields
         required = ["doctor_id", "doctor_name", "specialization", "appointment_date", "appointment_time", "reason"]
@@ -266,33 +270,60 @@ async def send_message(
     # If user is confirming, check if there's a pending booking in recent messages
     if user_confirming:
         pending_booking = await extract_pending_booking(recent_messages)
-        print(f"[DEBUG] User confirming: {user_confirming}, Pending booking: {pending_booking}")
+        try:
+            print(f"[DEBUG] User confirming: {user_confirming}, Pending booking: {pending_booking}")
+        except UnicodeEncodeError:
+            safe_msg = f"[DEBUG] User confirming: {user_confirming}, Pending booking: {pending_booking}".encode('ascii', 'replace').decode('ascii')
+            print(safe_msg)
     
     # Get LLM response with tools enabled
     assistant_response = await llm_service.get_completion(formatted_messages, tools_available=True)
     
-    # Debug: Log the raw LLM response
-    print(f"[DEBUG] Raw LLM Response: {assistant_response[:500] if len(assistant_response) > 500 else assistant_response}")
-    
+    # Debug: Log the raw LLM response (handle Windows console encoding issues)
+    try:
+        debug_response = assistant_response[:500] if len(assistant_response) > 500 else assistant_response
+        print(f"[DEBUG] Raw LLM Response: {debug_response}")
+    except UnicodeEncodeError:
+        # Fallback: replace non-encodable characters
+        debug_response = assistant_response[:500] if len(assistant_response) > 500 else assistant_response
+        safe_response = debug_response.encode('ascii', 'replace').decode('ascii')
+        print(f"[DEBUG] Raw LLM Response: {safe_response}")
+
     # Check if LLM wants to call a tool
     tool_call = llm_service.parse_tool_call(assistant_response)
-    
-    print(f"[DEBUG] Parsed tool_call: {tool_call}")
+
+    try:
+        print(f"[DEBUG] Parsed tool_call: {tool_call}")
+    except UnicodeEncodeError:
+        safe_tool_call = str(tool_call).encode('ascii', 'replace').decode('ascii')
+        print(f"[DEBUG] Parsed tool_call: {safe_tool_call}")
     
     # FALLBACK: If user said YES but LLM didn't call book_appointment, force the booking
     if user_confirming and pending_booking and not tool_call:
-        print(f"[DEBUG] FALLBACK: Forcing booking with pending details: {pending_booking}")
+        try:
+            print(f"[DEBUG] FALLBACK: Forcing booking with pending details: {pending_booking}")
+        except UnicodeEncodeError:
+            safe_msg = f"[DEBUG] FALLBACK: Forcing booking with pending details: {pending_booking}".encode('ascii', 'replace').decode('ascii')
+            print(safe_msg)
         tool_call = ("", "book_appointment", pending_booking)
-    
+
     if tool_call:
         before_text, tool_name, parameters = tool_call
-        
-        print(f"[DEBUG] Executing tool: {tool_name} with parameters: {parameters}")
-        
+
+        try:
+            print(f"[DEBUG] Executing tool: {tool_name} with parameters: {parameters}")
+        except UnicodeEncodeError:
+            safe_msg = f"[DEBUG] Executing tool: {tool_name} with parameters: {parameters}".encode('ascii', 'replace').decode('ascii')
+            print(safe_msg)
+
         # Execute the tool
         tool_result = await tools_service.execute_tool(tool_name, parameters, current_user.user_id)
-        
-        print(f"[DEBUG] Tool result: {tool_result}")
+
+        try:
+            print(f"[DEBUG] Tool result: {tool_result}")
+        except UnicodeEncodeError:
+            safe_msg = str(tool_result).encode('ascii', 'replace').decode('ascii')
+            print(f"[DEBUG] Tool result: {safe_msg}")
         
         # Format the tool result for display
         if tool_result.get("success"):

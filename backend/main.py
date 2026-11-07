@@ -29,6 +29,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:3000",
         "https://medical-ai-agent.netlify.app",
+        "https://medical-llm-bot-brown.vercel.app",
         "https://medical-llm-bw4yy2pn7-code-x-e1c4.vercel.app",
     ],
     allow_credentials=True,

@@ -37,7 +37,9 @@ class EmailService:
             
             return True
         except Exception as e:
-            print(f"Error sending email: {e}")
+            print(f"Error sending email: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def generate_otp(self, length: int = 6) -> str:

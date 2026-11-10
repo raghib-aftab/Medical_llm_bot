@@ -19,31 +19,43 @@ async def forgot_password(request: ForgotPasswordRequest):
     """Send new password to user's email"""
     # Get user by email
     user = await db_service.get_user_by_email(request.email)
-    
+
     if not user:
         # Don't reveal if email exists or not for security
         return {"message": "If the email exists, a new password has been sent"}
-    
+
     # Generate new password
     new_password = email_service.generate_password()
-    
-    # Hash and update password
+
+    # Hash the new password (don't update DB yet)
     hashed_password = get_password_hash(new_password)
-    await db_service.update_user_password(user["id"], hashed_password)
-    
-    # Send password reset email
+
+    # Send password reset email FIRST
     email_sent = await email_service.send_password_reset(
         email=user["email"],
         name=user["name"],
         new_password=new_password
     )
-    
+
     if not email_sent:
+        # Email failed - DB unchanged, user keeps current password
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to send password reset email"
         )
-    
+
+    # Email accepted by Resend - now commit password change to DB
+    db_updated = await db_service.update_user_password(user["id"], hashed_password)
+
+    if not db_updated:
+        # Email sent but DB update failed - log clearly, don't claim success
+        # User received email but new password won't work; they can retry
+        print(f"ERROR: Password reset email sent to {user['email']} but DB update failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update password. Please try again."
+        )
+
     return {"message": "If the email exists, a new password has been sent"}
 
 @router.post("/signup", response_model=Token)
